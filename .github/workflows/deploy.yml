@@ -1,0 +1,64 @@
+name: Fresh Node.js CI/CD Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Write env files on server
+      - name: Write PROD & STAGING ENV
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # Create project folder on server
+            mkdir -p /var/www/fresh-pipeline
+
+            # Write PROD_ENV
+            echo "${{ secrets.PROD_ENV }}" > /var/www/fresh-pipeline/pord.env
+            chmod 600 /var/www/fresh-pipeline/pord.env
+
+            # Write STAGING_ENV
+            echo "${{ secrets.STAGING_ENV }}" > /var/www/fresh-pipeline/staging.env
+            chmod 600 /var/www/fresh-pipeline/staging.env
+
+            # Verify
+            echo "✅ PROD_ENV: $(cat /var/www/fresh-pipeline/pord.env)"
+            echo "✅ STAGING_ENV: $(cat /var/www/fresh-pipeline/staging.env)"
+
+      # 3️⃣ Upload Node.js files to server
+      - name: Upload Node.js files
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          source: "index.js,package.json"
+          target: "/var/www/fresh-pipeline/"
+
+      # 4️⃣ Optional: Install dependencies (npm modules)
+      - name: Install dependencies
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /var/www/fresh-pipeline
+            npm install
+            echo "✅ Dependencies installed"
